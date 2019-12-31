@@ -122,11 +122,13 @@ mod term {
             self.writer.write_all(s.as_bytes())
         }
 
-        fn consume_to_end(&mut self) -> io::Result<()> {
+        fn consume_to_end(&mut self) -> io::Result<String> {
             let mut nest = 0;
+            let mut out = vec![];
             while let Some(event) = self.iter.next() {
                 match event {
                     Start(_) => nest += 1,
+                    Text(t) => out.push(t),
                     End(_) => {
                         if nest == 0 {
                             break;
@@ -136,7 +138,7 @@ mod term {
                     _ => {}
                 }
             }
-            Ok(())
+            Ok(out.join(" "))
         }
 
         pub fn run(mut self) -> io::Result<()> {
@@ -144,6 +146,7 @@ mod term {
                 match event {
                     Start(tag) => match tag {
                         Tag::Emphasis => self.style(SetAttribute(Attribute::Bold))?,
+                        Tag::Strong => self.style(SetAttribute(Attribute::Bold))?,
                         Tag::Paragraph => self.write_str("\n")?,
                         Tag::Strikethrough => self.style(SetAttribute(Attribute::CrossedOut))?,
                         Tag::Link(ty, url, title) => {}
@@ -163,16 +166,76 @@ mod term {
                             //     "\x1b]1337;File=inline=1:iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABQtJREFUeNrsVktoXVUUXefc7/vmpUmaNonWSsFYtBZEWhRKERxI60QF6UhBOhAVEXEmzjrVQbXgTBRFB4oTlSq1FEGEiggWlKpVjG0wn9fXvE/u75zjOucmaVIrWhBB6IX9eO9+9tpr7bX3fcIYg//yENcB/33As+PX9oStr8GPvsClJ0dG1AXviIiKSYyJ1+SucFEI3KqXknFZHxpH7n0sW9Xj8UPjEA0Jk2j41wBU5+ejaOnH0NChansLmMjugB+MeDs0REsclGEC4ZHFuEAxPwOVNYfjA5PH5UgAfSnnhX/KUOFZNPWLjFZxxkd6OoKeq0COePCaPkTsQZKaKgCtDALSyM9eBG65+WLlwelZ9Usn5A0xM7X9v5VPYD8m1Ut6VmD5/RrUuRpkVEFwk4RsSRbDsgvhqi9yTVCF0LOPSohMDZtePkyw1YxTPmR+ZVft3SGKMEOEOzFanEw/D5B+2oTwa4h3kVGF/cgJVjDIzDbG1hZ7BkZJELY8f9mQbcZeRubPZY2N6hkPkTGjm0Y7J1AV04N3qshPDyHcWYE/YRvvwRSk4Et4nge9klMbjbzQ8KQpi4ZYn3aYcR/jmP9Jd3KVmtPQaIV+rfnEnu789O435hfUr63Ryt0VWJ1MSiA2SHgEFhLLJBJaYD5qpUyJXvM9mwXrZFxN/irjqB/IjaYxYfyAbuoXsjeX5nC+IaJ9MaSxmnlQTOZZQMnvKwWSEiU08HhLg8gqZ4uMWIezdhxjvEdz1VFGlW0OH1/YfO9bO0/UsGfu583FvuqYVAGWEoEBAYM4RGYkUiaUBK/XAgQBGdl+ybKfQogVHLHOee44xfiMd1nT5BA6fbk7Wj+8+dv58/d8dRrYvQlKhTBkE0ZlYsGkmRbIGT4l7nKQ+xmHmeCSEs4spjynqLq8muffZfTXxqKIw0T01I37Tr4+FGxPkcQTkLS8Zq+qse8YMTea1cAx0dqacEVWUfJoWcYUW+niaoBzjC8doGCzl4Yrvds/PLt1S95HOjUBn89IslIETHODPFeoVUO62NCgJYNGxXPWL2gYwxytGn8XBkl21f18yEpqAR/JqsFv9Zn+/TvPsYgdQxxNgX5hZ0pjqBGUgBouuUfp+knuxqFe8Z073Xmy7A0K5FmOZmyXk7nSOEcYJ32+Lp7rN6O7bvvivGqpZaRDY24XWFdra3eCxmRaZxRORzt0Tk9Y5TxXh3bFkSacZ9cGfgNTO/h7pfLlN1E7w7bZRQ9bIyCBq74SCtQj4QC5ILHUzVg96y4KWCUbvC6UQq+fIUncEnWbxp7XtiD9J1mfsXR9ynl40/cdjA36UDfUWKmhJ4wDEsatdyY2iKxRCu12pKGKqbK95HgovcbEskzygm62U7oBkJscH9ldKgfV8FS8nCDUuZPQVtfp8TtNYte/pG5JkqHTTZicTPLMbmmolIyTFFUm5+Llqyh392v2VOelvG6fXl5tPzBm2HWzf9tPS0eNNE8hZPPZg0bAyr3CDbOdL9uvZcrXFNyVXjkSlbgkVth+uZk3rndxZLePRiapUOQtilpwDgsmWnk9dcSPbx/A9u/ajV7S+VqExQ52plz0q6LYfAQNCJQpg7/+R7JygTdwkvjCzWDioVeqD08/LbfEMINyNv3ts33o0WrX/J4/X1xoHyRMzmrW0ppyrt0rT7On7rcwV+xls3ECjHsuxuLgg/xMG/HUVLn+bDHX/yb+7wH/EGAARjZ2jNWjuZgAAAAASUVORK5CYII=",
                             // ))?
                         }
+                        Tag::CodeBlock(language) => {
+                            use syntect::easy::HighlightLines;
+                            use syntect::highlighting::{Style, ThemeSet};
+                            use syntect::parsing::SyntaxSet;
+                            use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
+                            let ps = SyntaxSet::load_defaults_newlines();
+                            let ts = ThemeSet::load_defaults();
+                            let lcn = language.as_ref().to_lowercase();
+                            let syntax = ps
+                                .find_syntax_by_extension(&language)
+                                .or_else(|| {
+                                    let mapped_language = match lcn.as_ref() {
+                                        "jsx" => "JavaScript",
+                                        "scala" => "Scala",
+                                        other => &other,
+                                    };
+                                    // println!(
+                                    //     "{:?}",
+                                    //     ps.syntaxes()
+                                    //         .iter()
+                                    //         .map(|s| s.name.clone())
+                                    //         .collect::<Vec<String>>()
+                                    // );
+                                    ps.find_syntax_by_name(&mapped_language)
+                                })
+                                .unwrap_or_else(|| ps.find_syntax_plain_text());
+                            let mut h =
+                                HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]);
+                            let code = self.consume_to_end()?;
+                            for line in LinesWithEndings::from(&code) {
+                                // LinesWithEndings enables use of newlines mode
+                                let ranges: Vec<(Style, &str)> = h.highlight(line, &ps);
+                                for &(ref style, text) in ranges.iter() {
+                                    self.style(SetForegroundColor(Color::Rgb {
+                                        r: style.foreground.r,
+                                        g: style.foreground.g,
+                                        b: style.foreground.b,
+                                    }))?;
+                                    // self.style(SetBackgroundColor(Color::Rgb {
+                                    //     r: style.background.r,
+                                    //     g: style.background.g,
+                                    //     b: style.background.b,
+                                    // }))?;
+                                    self.write_str(text)?;
+                                }
+                            }
+                            self.style(ResetColor)?;
+                            self.write_str("\n")?;
+                        }
+                        Tag::List(_) => {}
+                        Tag::Item => {
+                            self.write_str("\n\t* ")?;
+                        }
                         other => {
                             print!("[todo:{:?}]", other);
                         }
                     },
                     Text(s) => self.write_str(&s)?,
                     End(tag) => match tag {
+                        Tag::Item => (),
                         Tag::Paragraph => self.write_str("\n")?,
                         Tag::Heading(level) => self.write_str("\n")?,
+                        Tag::List(_) => self.write_str("\n")?,
                         _ => self.style(ResetColor)?,
                     },
+                    Code(s) => {
+                        self.style(SetBackgroundColor(Color::DarkGrey))?;
+                        self.write_str(&s)?;
+                        self.style(ResetColor)?;
+                    }
                     _ => self.write_str("hi")?,
                 }
             }
